@@ -20,7 +20,9 @@
         let timerInterval = null;
         let alarmInterval = null;
         let audioCtx = null;
+        
         let timeRemaining = 1500; // Default 25 minutes in seconds
+        let endTime = null;       // Timestamp when the timer should finish
         let isTimerRunning = false;
 
         const display = document.getElementById('timer-display');
@@ -38,33 +40,43 @@
         window.addEventListener('beforeunload', (e) => {
             if (isTimerRunning) {
                 e.preventDefault();
-                e.returnValue = ''; // Required by modern browsers to trigger the dialog
+                e.returnValue = ''; 
             }
         });
 
         // Helper to format time (MM:SS)
         function updateDisplay() {
-            const minutes = Math.floor(timeRemaining / 60);
-            const seconds = timeRemaining % 60;
+            const minutes = Math.floor(Math.max(0, timeRemaining) / 60);
+            const seconds = Math.max(0, timeRemaining) % 60;
             display.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
         }
 
-        // Core timer logic
+        // Core timer logic using timestamps
         function startTimer(durationSeconds) {
             stopTimerAndAlarm(); // Reset anything currently running
             
-            timeRemaining = durationSeconds;
             isTimerRunning = true;
+            
+            // Calculate EXACTLY when this timer should end using the system clock
+            const now = Date.now();
+            endTime = now + (durationSeconds * 1000);
+            
+            timeRemaining = durationSeconds;
             updateDisplay();
 
             timerInterval = setInterval(() => {
-                timeRemaining--;
-                updateDisplay();
+                // Calculate remaining time based on current actual time vs end time
+                const timeLeftMs = endTime - Date.now();
+                timeRemaining = Math.ceil(timeLeftMs / 1000);
 
                 if (timeRemaining <= 0) {
+                    timeRemaining = 0;
+                    updateDisplay();
                     clearInterval(timerInterval);
                     isTimerRunning = false;
                     triggerAlert();
+                } else {
+                    updateDisplay();
                 }
             }, 1000);
         }
@@ -94,8 +106,8 @@
 
         // Repeat the alarm sound continuously
         function startAlarmLoop() {
-            playBeep(); // Play instantly first
-            alarmInterval = setInterval(playBeep, 1000); // Repeat every second
+            playBeep(); 
+            alarmInterval = setInterval(playBeep, 1000); 
         }
 
         // Notification and Sound Trigger
