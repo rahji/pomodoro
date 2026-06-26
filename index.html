@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pomodoro Timer</title>
+</head>
+<body>
+
+    <h1>Pomodoro Timer</h1>
+
+    <div id="timer-display" style="font-size: 2em; font-weight: bold; margin-bottom: 10px;">25:00</div>
+
+    <button id="pomodoro-btn">25 Min Pomodoro</button>
+    <button id="short-btn">5 Min Short Break</button>
+    <button id="long-btn">15 Min Long Break</button>
+    <button id="stop-btn">Stop</button>
+
+    <script>
+        let timerInterval = null;
+        let alarmInterval = null;
+        let audioCtx = null;
+        let timeRemaining = 1500; // Default 25 minutes in seconds
+        let isTimerRunning = false;
+
+        const display = document.getElementById('timer-display');
+        const pomodoroBtn = document.getElementById('pomodoro-btn');
+        const shortBtn = document.getElementById('short-btn');
+        const longBtn = document.getElementById('long-btn');
+        const stopBtn = document.getElementById('stop-btn');
+
+        // Request notification permission on load
+        if (Notification.permission !== "granted" && Notification.permission !== "denied") {
+            Notification.requestPermission();
+        }
+
+        // Warn user before closing the window if a timer is active
+        window.addEventListener('beforeunload', (e) => {
+            if (isTimerRunning) {
+                e.preventDefault();
+                e.returnValue = ''; // Required by modern browsers to trigger the dialog
+            }
+        });
+
+        // Helper to format time (MM:SS)
+        function updateDisplay() {
+            const minutes = Math.floor(timeRemaining / 60);
+            const seconds = timeRemaining % 60;
+            display.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        }
+
+        // Core timer logic
+        function startTimer(durationSeconds) {
+            stopTimerAndAlarm(); // Reset anything currently running
+            
+            timeRemaining = durationSeconds;
+            isTimerRunning = true;
+            updateDisplay();
+
+            timerInterval = setInterval(() => {
+                timeRemaining--;
+                updateDisplay();
+
+                if (timeRemaining <= 0) {
+                    clearInterval(timerInterval);
+                    isTimerRunning = false;
+                    triggerAlert();
+                }
+            }, 1000);
+        }
+
+        // Generate a single beep using Web Audio API
+        function playBeep() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(880, audioCtx.currentTime); // A5 note
+            
+            gain.gain.setValueAtTime(0, audioCtx.currentTime);
+            gain.gain.linearRampToValueAtTime(0.5, audioCtx.currentTime + 0.05);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.4);
+            
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.4);
+        }
+
+        // Repeat the alarm sound continuously
+        function startAlarmLoop() {
+            playBeep(); // Play instantly first
+            alarmInterval = setInterval(playBeep, 1000); // Repeat every second
+        }
+
+        // Notification and Sound Trigger
+        function triggerAlert() {
+            startAlarmLoop();
+
+            if (Notification.permission === "granted") {
+                new Notification("Time's up!", {
+                    body: "Your session has finished.",
+                });
+            } else {
+                alert("Time's up!");
+            }
+        }
+
+        // Completely clear timers, loops, and states
+        function stopTimerAndAlarm() {
+            clearInterval(timerInterval);
+            clearInterval(alarmInterval);
+            isTimerRunning = false;
+        }
+
+        // Event Listeners
+        pomodoroBtn.addEventListener('click', () => startTimer(25 * 60));
+        shortBtn.addEventListener('click', () => startTimer(5 * 60));
+        longBtn.addEventListener('click', () => startTimer(15 * 60));
+        
+        stopBtn.addEventListener('click', stopTimerAndAlarm);
+
+        // Initialize display
+        updateDisplay();
+    </script>
+</body>
+</html>
